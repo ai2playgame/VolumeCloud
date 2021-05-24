@@ -6,6 +6,9 @@ namespace Yangrc.VolumeCloud {
     [CreateAssetMenu]
     public class VolumeCloudConfiguration : ScriptableObject {
 
+        [Header("Additional")]
+        public Texture2D rampTexture;
+
         [Header("Weather map")]
         [Tooltip("R for coverage, G for density, B for cloud type")]
         public Texture2D weatherTex;
@@ -51,7 +54,7 @@ namespace Yangrc.VolumeCloud {
         [Range(0.1f, 2.0f)]
         public float scatteringCoefficient = .5f;
         [Range(0.1f, 2.0f)]
-        public float extinctionCoefficient = .52f;  
+        public float extinctionCoefficient = .52f;
 
         [Header("Lighting - Multi Scattering Approximation")]
         [Range(0.01f, 1)]
@@ -108,6 +111,8 @@ namespace Yangrc.VolumeCloud {
             public static int atmosphereColorSaturateDistance = Shader.PropertyToID("_AtmosphereColorSaturateDistance");
             public static int atmosphereColor = Shader.PropertyToID("_AtmosphereColor");
             public static int ambientColor = Shader.PropertyToID("_AmbientColor");
+
+            public static int rampTexture = Shader.PropertyToID("_RampTex");
         }
 
         public void ApplyToMaterial(Material mat) {
@@ -144,6 +149,8 @@ namespace Yangrc.VolumeCloud {
             mat.SetFloat(PropertyHash.atmosphereColorSaturateDistance, atmosphereSaturateDistance);
             mat.SetColor(PropertyHash.atmosphereColor, atmosphereColor);
             mat.SetColor(PropertyHash.ambientColor, ambientColor);
+
+            mat.SetTexture(PropertyHash.rampTexture, rampTexture);
         }
     }
 }

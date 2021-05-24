@@ -1,6 +1,6 @@
 #pragma once
 #include "./CloudShaderHelper.cginc"
- 
+
 float GetDensity(float3 startPos, float3 dir, float maxSampleDistance, int sample_count, float raymarchOffset, out float intensity,out float depth) {
 	float sampleStart, sampleEnd;
 	if (!resolve_ray_start_end(startPos, dir, sampleStart, sampleEnd) ) {
@@ -36,6 +36,7 @@ float GetDensity(float3 startPos, float3 dir, float maxSampleDistance, int sampl
 		if (result.intTransmittance < 0.005f) {
 			break;
 		}
+		//
 	}
 
 	depth = result.depth / result.depthweightsum;
@@ -43,5 +44,5 @@ float GetDensity(float3 startPos, float3 dir, float maxSampleDistance, int sampl
 		depth = length(sampleEnd - startPos);
 	}
 	intensity = result.intensity;
-	return (1.0f - result.intTransmittance);	
+	return (1.0f - result.intTransmittance);
 }

@@ -23,7 +23,7 @@ float IntersectWithCellBoundary(float3 origin, float3 v, uint zlevel, int2 cellI
 
     uint currentLevelSize = _HeightMapSize >> zlevel;
     float cellSpacing = _WeatherTexSize / currentLevelSize;
-    
+
     //x-axis plane.
     float2 xAxisPlanes = (cellIndex.x + float2(0.0, 1.0)) * cellSpacing;   //Same as float2((cellIndex.x + 0.5) * cellSpacing), (cellIndex.x - 0.5) * cellSpacing))
     float2 xAxisIntersectT = (xAxisPlanes - origin.x) / v.x;
@@ -62,7 +62,7 @@ float HierarchicalRaymarch(float3 viewerPos, float3 dir, float maxSampleDistance
 
 	uint currentZLevel = 2;
     float currentStep = sampleStart / stepSize + raymarchOffset;
-    
+
 	RaymarchStatus result;
 	InitRaymarchStatus(result);
 
@@ -91,10 +91,10 @@ float HierarchicalRaymarch(float3 viewerPos, float3 dir, float maxSampleDistance
                 intersected = false;
             }
         }
-         
+
         if (intersected) { //Current raypos is inside cloud of current level.
             //Move raypos to just beyond rayhitStepSize
-            currentStep += ceil(rayhitStepSize);            
+            currentStep += ceil(rayhitStepSize);
             if (currentZLevel == _HiHeightMinLevel) { //We can do raymarch now.
 				IntegrateRaymarch(viewerPos, raypos, dir, stepSize, result);
 				if (result.intTransmittance < 0.01f) {	//Save gpu, save the world.
@@ -110,11 +110,11 @@ float HierarchicalRaymarch(float3 viewerPos, float3 dir, float maxSampleDistance
             currentZLevel = min(currentZLevel + 1, _HiHeightMaxLevel);
         }
     }
-    
+
 	depth = result.depth / result.depthweightsum;
 	if (depth == 0.0f) {
 		depth = sampleEnd;
 	}
 	intensity = result.intensity;
-	return (1.0f - result.intTransmittance);	
+	return (1.0f - result.intTransmittance);
 }

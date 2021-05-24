@@ -39,6 +39,8 @@ Shader "Yangrc/CloudShader"
 		_AmbientColor("AmbientColor", Color) = (1,1,1,1)
 		_AtmosphereColor("AtmosphereColor" , Color) = (1,1,1,1)
 		_AtmosphereColorSaturateDistance("AtmosphereColorSaturateDistance", float) = 80000
+
+		_RampTex("RampTex",2D) = "white"{}
 	}
 
 		SubShader
@@ -55,8 +57,8 @@ Shader "Yangrc/CloudShader"
 					raymarchEnd = sceneDepth * _ProjectionParams.z;	//raymarch to scene depth.
 				}
 	#else
-				raymarchEnd = 1e8;	//Always raymarch. 
-				//Note: In horizon:zero dawn, they clip some part using lod(use max operator) z-buffer. 
+				raymarchEnd = 1e8;	//Always raymarch.
+				//Note: In horizon:zero dawn, they clip some part using lod(use max operator) z-buffer.
 				//I don't implement here cause that's exactly what hi-z buffer does, and any production rendering pipeline should share a hi-z buffer by their own.
 	#endif
 				return raymarchEnd;
@@ -80,17 +82,17 @@ Shader "Yangrc/CloudShader"
 			#include "./CloudHierarchicalRaymarch.cginc"
 #else
 			#include "./CloudNormalRaymarch.cginc"
-#endif	
+#endif
 			#include "UnityCG.cginc"
 
 #if defined(HIGH_QUALITY)
 			#define MIN_SAMPLE_COUNT 32
 			#define MAX_SAMPLE_COUNT 32
-#endif	
+#endif
 #if defined(MEDIUM_QUALITY)
 			#define MIN_SAMPLE_COUNT 24
 			#define MAX_SAMPLE_COUNT 24
-#endif	
+#endif
 #if defined(LOW_QUALITY)
 			#define MIN_SAMPLE_COUNT 16
 			#define MAX_SAMPLE_COUNT 16
@@ -127,22 +129,22 @@ Shader "Yangrc/CloudShader"
 				float3 vspos = float3(i.vsray, 1.0);
 				float4 worldPos = mul(unity_CameraToWorld,float4(vspos,1.0));
 				worldPos /= worldPos.w;
-				
+
 				float sceneDepth = Linear01Depth(_DownsampledDepth.Sample(sampler_DownsampledDepth, (i.screenPos / i.screenPos.w).xy));
 				//TODO: sceneDepth here is distance in camera z-axis, but should be radial distance.
 				//For now it causes bug that when allow cloud front object is enabled, the cloud is different when rotating camera.
-				float raymarchEnd = GetRaymarchEndFromSceneDepth(sceneDepth);	
+				float raymarchEnd = GetRaymarchEndFromSceneDepth(sceneDepth);
 				float3 viewDir = normalize(worldPos.xyz - _WorldSpaceCameraPos);
 				int sample_count = lerp(MAX_SAMPLE_COUNT, MIN_SAMPLE_COUNT, abs(viewDir.y));	//dir.y ==0 means horizontal, use maximum sample count
 
 				float2 screenPos = i.screenPos.xy / i.screenPos.w;
 				int2 texelID = int2(fmod(screenPos/ _TexelSize , 3.0));	//Calculate a texel id to index bayer matrix.
-										
+
 				float bayerOffset = (bayerOffsets[texelID.x][texelID.y]) / 9.0f;	//bayeroffset between[0,1)
 				float offset = -fmod(_RaymarchOffset + bayerOffset, 1.0f);			//final offset combined. The value will be multiplied by sample step in GetDensity.
 
 				float intensity, distance;
-				
+
 #if USE_HI_HEIGHT
 				int iteration_count;
 				float density = HierarchicalRaymarch(worldPos, viewDir, raymarchEnd, sample_count, offset, /*out*/intensity, /*out*/distance, /*out*/iteration_count);
@@ -161,11 +163,11 @@ Shader "Yangrc/CloudShader"
 				#pragma vertex vert
 				#pragma fragment frag
 				#pragma multi_compile _ ALLOW_CLOUD_FRONT_OBJECT
-				#pragma multi_compile LOW_QUALITY MEDIUM_QUALITY HIGH_QUALITY	
+				#pragma multi_compile LOW_QUALITY MEDIUM_QUALITY HIGH_QUALITY
 
 				#include "./CloudShaderHelper.cginc"
 				#include "UnityCG.cginc"
-				
+
 				sampler2D _MainTex;						//history buffer.
 				float4 _MainTex_TexelSize;
 				sampler2D _UndersampleCloudTex;			//current undersampled tex.
@@ -229,18 +231,18 @@ Shader "Yangrc/CloudShader"
 					else
 						return prevSample;// point inside aabb
 				}
-				
+
 				float4 frag(v2f i) : SV_Target
 				{
 					float3 vspos = float3(i.vsray, 1.0);
 					float4 worldPos = mul(unity_CameraToWorld, float4(vspos, 1.0f));
 					worldPos /= worldPos.w;
 					float4 raymarchResult = tex2D(_UndersampleCloudTex, i.uv);
-					float distance = raymarchResult.y;		
+					float distance = raymarchResult.y;
 					float intensity = raymarchResult.x;
 					half outOfBound;
 					float2 prevUV = PrevUV(mul(unity_CameraToWorld, float4(normalize(vspos) * distance, 1.0)), outOfBound);	//find uv in history buffer.
-					
+
 					{	//Do temporal reprojection and clip things.
 						float4 prevSample = tex2D(_MainTex, prevUV);
 						float2 xoffset = float2(_UndersampleCloudTex_TexelSize.x, 0.0f);
@@ -288,7 +290,7 @@ Shader "Yangrc/CloudShader"
 						float4 sigma = sqrt(abs(m2 / validSampleCount - mu * mu));
 						float4 minc = mu - gamma * sigma;
 						float4 maxc = mu + gamma * sigma;
-						prevSample = ClipAABB(minc, maxc, prevSample);	
+						prevSample = ClipAABB(minc, maxc, prevSample);
 
 						//Blend.
 						raymarchResult = lerp(prevSample, raymarchResult, max(0.05f, outOfBound));
@@ -321,6 +323,12 @@ Shader "Yangrc/CloudShader"
 				SamplerState Point_Clamp_Sampler;
 				float4 _ProjectionExtents;
 				float3 _AtmosphereColor;
+
+				sampler2D _RampTex;
+
+				float map(float value, float min1, float max1, float min2, float max2) {
+					return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
+				}
 
 				struct appdata
 				{
@@ -368,7 +376,7 @@ Shader "Yangrc/CloudShader"
 				#include "Assets/AtmosphereScattering/Shaders/AerialPerspectiveHelper.cginc"
 #else
 				float _AtmosphereColorSaturateDistance;
-#endif	
+#endif
 
 				half4 frag(v2f i) : SV_Target
 				{
@@ -377,15 +385,32 @@ Shader "Yangrc/CloudShader"
 					float3 viewDir = normalize(worldPos.xyz - _WorldSpaceCameraPos);
 
 					half4 mcol = tex2D(_MainTex,i.uv);
-					
+
 #ifdef ALLOW_CLOUD_FRONT_OBJECT
 					float4 currSample = Upsample(i, _CloudTex, _CameraDepthTexture, _DownsampledDepth, sampler_CameraDepthTexture, sampler_CloudTex);
 #else
 					float4 currSample = _CloudTex.Sample(sampler_CloudTex, i.uv);
 #endif
-					
+
 					float depth = currSample.g;
-					
+
+					// 傾き算出
+					// float dhdx = ddx(currSample.g);
+					// float dhdy = ddy(currSample.g);
+					// return half4(dhdx, dhdy, 0.0, 1.0);
+
+					float dx0 = _CloudTex.Sample(sampler_CloudTex, (i.uv + float2(_CloudTex_TexelSize.x, 0.0))).g;
+					float dx1 = _CloudTex.Sample(sampler_CloudTex, (i.uv + float2(-_CloudTex_TexelSize.x, 0.0))).g;
+					float dy0 = _CloudTex.Sample(sampler_CloudTex, (i.uv + float2(0.0, _CloudTex_TexelSize.y))).g;
+					float dy1 = _CloudTex.Sample(sampler_CloudTex, (i.uv + float2(0.0, -_CloudTex_TexelSize.y))).g;
+					float3 normal = cross(float3(1.0, 0.0, dx1-dx0), float3(0.0, 1.0, dy1-dy0));
+					normal = normalize(normal);
+					float luminance = dot(normal, normalize(_WorldSpaceLightPos0));
+					luminance = map(luminance, -1, 1, 0, 1);
+					float3 rampCol = tex2D(_RampTex, float2(luminance, 0.5)).rgb;
+					// return float4(col, 1.0);
+					// return float4(normal, 1.0);
+
 					float3 sunColor;
 #ifdef USE_YANGRC_AP
 					{
@@ -401,6 +426,8 @@ Shader "Yangrc/CloudShader"
 #endif
 					float4 result;
 					result.rgb = currSample.r * sunColor + currSample.b *_AmbientColor * currSample.a;
+					// result.rgb = currSample.r * rampCol + currSample.b *_AmbientColor * currSample.a;
+					// result.rgb = currSample.r * float3(1.0, 1.0, 1.0) + currSample.b *_AmbientColor;
 					result.a = currSample.a;
 #ifdef USE_YANGRC_AP
 					{
@@ -415,9 +442,9 @@ Shader "Yangrc/CloudShader"
 
 						//Transmittance to target point.
 						float3 transmittanceToTarget = GetTransmittanceLerped(r, mu, depth, ray_r_mu_intersects_ground);
-					
-						//Here the two ray (r, mu) and (r_d, mu_d) is pointing same direction. 
-						//so ray_r_mu_intersects_ground should apply to both of them. 
+
+						//Here the two ray (r, mu) and (r_d, mu_d) is pointing same direction.
+						//so ray_r_mu_intersects_ground should apply to both of them.
 						//If we do intersect calculation later, some precision problems might appear, causing glitches near horizontal view dir.
 						float3 scatteringBetween =
 							GetTotalScatteringLerped(r, mu, mu_s, nu, ray_r_mu_intersects_ground)
@@ -427,16 +454,22 @@ Shader "Yangrc/CloudShader"
 					}
 #else
 					float atmosphericBlendFactor = exp(-depth / _AtmosphereColorSaturateDistance);
-					result.rgb = lerp(_AtmosphereColor, result.rgb, saturate(atmosphericBlendFactor));
+					// result.rgb = lerp(_AtmosphereColor, result.rgb, saturate(atmosphericBlendFactor));
+					result.rgb = lerp(rampCol, result.rgb, saturate(atmosphericBlendFactor));
 #endif
 
 #if ALLOW_CLOUD_FRONT_OBJECT	//The result calculated from previous pass is already the part in front of object.
-					return half4(mcol.rgb * (1 - result.a) + result.rgb * result.a, 1);
+					return half4(mcol.rgb * (1 - result.a) + result.rgb * result.a, 1.0);
 #else
 					//Only use cloud if no object detected in z-buffer.
 					float sceneDepth = Linear01Depth(_CameraDepthTexture.Sample(sampler_CameraDepthTexture, (i.screenPos / i.screenPos.w).xy));
 					if (sceneDepth == 1.0f) {
-						return half4(mcol.rgb * (1 - result.a) + result.rgb * result.a, 1);
+						if (result.a == 0.0) {
+							return half4(mcol.rgb, 1);
+						} else {
+							return half4(result.rgb, 1);
+						}
+						// return half4(mcol.rgb * (1 - result.a) + result.rgb * result.a, 1);
 					}
 					else {
 						return mcol;
@@ -452,7 +485,7 @@ Shader "Yangrc/CloudShader"
 					CGPROGRAM
 #pragma vertex vert
 #pragma fragment frag
-#pragma multi_compile 
+#pragma multi_compile
 #include "UnityCG.cginc"
 
 
@@ -510,7 +543,7 @@ Shader "Yangrc/CloudShader"
 					CGPROGRAM
 #pragma vertex vert
 #pragma fragment frag
-#pragma multi_compile 
+#pragma multi_compile
 #include "UnityCG.cginc"
 
 
