@@ -79,7 +79,7 @@ float SampleHeight(float heightPercent,float cloudType) {
 	}
 	else {
 		gradient = lerp(cloudGradients[1], cloudGradients[2], (cloudType - 0.5)*2.0);
-	} 
+	}
 
 	return RemapClamped(heightPercent, gradient.x, gradient.y, 0.0, 1.0)
 			* RemapClamped(heightPercent, gradient.z, gradient.w, 1.0, 0.0);
@@ -87,7 +87,7 @@ float SampleHeight(float heightPercent,float cloudType) {
 
 float3 ApplyWind(float3 worldPos) {
 	float heightPercent = HeightPercent(worldPos);
-	
+
 	// skew in wind direction
 	worldPos.xz -= (heightPercent) * _WindDirection.xy * _CloudTopOffset;
 
@@ -121,7 +121,7 @@ float ApplyCoverageToDensity(float sampleResult, float coverage){
 float SampleDensity(float3 worldPos,int lod, bool cheap, out float wetness) {
 	//Store the pos without wind applied.
 	float3 unwindWorldPos = worldPos;
-	
+
 	//Sample the weather map.
 	float4 coverageSampleUV = float4((unwindWorldPos.xz / _WeatherTexSize), 0, 0);
 	coverageSampleUV.xy = (coverageSampleUV.xy + 0.5);
@@ -239,7 +239,7 @@ bool resolve_ray_start_end(float3 ws_origin, float3 ws_ray, out float start, out
 		return false;	//you see nothing.
 
 	bool inIntersected = ray_trace_sphere(ws_origin, ws_ray, EARTH_CENTER, EARTH_RADIUS + _CloudStartHeight, it1, it2);
-	
+
 	if (inIntersected) {
 		if (it1 * it2 < 0) {
 			//we're on ground.
@@ -299,7 +299,7 @@ void IntegrateRaymarch(float3 startPos, float3 rayPos, float3 viewdir, float ste
 
 	float clampedExtinction = max(extinction, 1e-7);
 	float transmittance = exp(-extinction * stepsize);
-			
+
 	float luminance = SampleEnergy(rayPos, viewdir) * lerp(1.0f, 0.3f, wetness);
 	float integScatt = (luminance - luminance * transmittance) / clampedExtinction;
 	float depthWeight = result.intTransmittance;		//Is it a better idead to use (1-transmittance) * intTransmittance as depth weight?
@@ -308,4 +308,23 @@ void IntegrateRaymarch(float3 startPos, float3 rayPos, float3 viewdir, float ste
 	result.depth += depthWeight * length(rayPos - startPos);
 	result.depthweightsum += depthWeight;
 	result.intTransmittance *= transmittance;
+}
+
+float easeInOutExpo(float t) {
+    if (t == 0.0 || t == 1.0) {
+        return t;
+    }
+    if ((t *= 2.0) < 1.0) {
+        return 0.5 * pow(2.0, 10.0 * (t - 1.0));
+    } else {
+        return 0.5 * (-pow(2.0, -10.0 * (t - 1.0)) + 2.0);
+    }
+}
+
+float easeInOutCubic(float t) {
+    if ((t *= 2.0) < 1.0) {
+        return 0.5 * t * t * t;
+    } else {
+        return 0.5 * ((t -= 2.0) * t * t + 2.0);
+    }
 }
