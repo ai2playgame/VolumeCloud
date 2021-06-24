@@ -150,6 +150,7 @@ Shader "Yangrc/CloudShader"
 #else
 				float density = GetDensity(worldPos, viewDir, raymarchEnd, sample_count, offset, /*out*/intensity, /*out*/distance);
 #endif
+				density = easeInOutExpo(density);
 				return float4(intensity, distance, 1.0f, density);
 			}
 
@@ -412,7 +413,7 @@ Shader "Yangrc/CloudShader"
 					float3 rampCol = tex2D(_RampTex, float2(currSample.r, 0.5)).rgb;
 
 					float4 result;
-					currSample.a = easeInOutExpo(currSample.a);
+					// currSample.a = easeInOutExpo(currSample.a);
 					// result.rgb = currSample.r * sunColor + currSample.b *_AmbientColor * currSample.a;
 					result.rgb = currSample.r * sunColor + currSample.b * rampCol * currSample.a;
 					result.a = currSample.a;
